@@ -245,26 +245,28 @@ public class TCPService extends Service {
                 String host = "<" + mServiceSocket.getInetAddress().toString() + ":" + mServiceSocket.getPort() + ">";
                 writer.println("hello"+host);
                 writer.flush();
-                String str;
+                String received;
                 while (mKeepRunning && mServiceSocket != null && !mServiceSocket.isClosed()) {
                     try{
-                        str = buffer_reader.readLine();
-                        Logger.d("TCPService: 收到客户端发送的消息：str="+str);
-
-                        if (str == null) {
-                            Logger.e("TCPService: 客户端"+mTag+" 已经断开了");
-                            break;
-                        }
-                        else {
-                            if (str.startsWith("register")) {
-                                String name = str.split("\\|")[1];
+                        received = buffer_reader.readLine();
+                        Logger.d("TCPService: 收到客户端发送的消息：received="+received);
+                        if (!TextUtils.isEmpty(received)) {
+                            SocketDevice device = mSocketDevices.get(mTag);
+                            if (received.startsWith("register")) {
+                                String name = received.split("\\|")[1];
                                 Logger.d("TCPService: 客户端登录成功：name="+name);
-
-                                SocketDevice device = mSocketDevices.get(mTag);
                                 device.name = name;
                                 device.isRegisted = true;
                                 Logger.e("TCPService: 有一个新的设备加入： device="+device);
                                 EventBus.getDefault().post(new MessageEvent(MessageEvent.CMD_S_TCP_CLIENT_CHANGE));
+                            }
+                            else if(received.equals("PING")) {
+                                // TODO 接收到心跳包
+
+                            }
+                            else {
+                                // 服务端收到了消息
+                                EventBus.getDefault().post(new MessageEvent(MessageEvent.CMD_S_RECV_CLIENT_MESSAGE, received, mTag));
                             }
                         }
                         //ReceivedMessage.append("client"+no+"say: "+str+"\n");
@@ -279,6 +281,7 @@ public class TCPService extends Service {
                 }
                 mSocketDevices.remove(mTag);
                 buffer_reader.close();
+                writer.close();
                 // 状态发生变化
                 EventBus.getDefault().post(new MessageEvent(MessageEvent.CMD_S_TCP_CLIENT_CHANGE));
             } catch (Exception e) {
@@ -350,17 +353,23 @@ public class TCPService extends Service {
                 String received="";
                 // 注意这里in()也是阻塞式的，所以不会一直循环跑，而是等待发送过来的命令消息
                 Logger.d("TCPConnectThread 客户端进入等到消息 socket="+mClientSocket);
+                PrintWriter writer = new PrintWriter(mClientSocket.getOutputStream());
                 while (mKeepRunning && mClientSocket != null && !mClientSocket.isClosed()) {
                     // 通知UI 更新
                     received = buffer_reader.readLine();
                     Logger.d("TCPConnectThread：客户端收到消息 received ="+received);
-                    //sendMsg("MSG", received);
-                    if (received.startsWith("hello")) {
-                        PrintWriter writer = new PrintWriter(mClientSocket.getOutputStream());
-                        writer.println("register|"+"sn30008001");
-                        writer.flush();
+                    if (!TextUtils.isEmpty(received)) {
+                        if (received.startsWith("hello")) {
+                            writer.println("register|"+mMasterID);
+                            writer.flush();
+                        }
+                        else {
+                            EventBus.getDefault().post(new MessageEvent(MessageEvent.CMD_S_RECV_CLIENT_MESSAGE, received));
+                        }
                     }
                 }
+                writer.close();
+                buffer_reader.close();
                 Logger.d("TCPConnectThread thread run exit---received="+received);
             } catch (Exception e) {
                 e.printStackTrace();
@@ -394,15 +403,16 @@ public class TCPService extends Service {
         mThreadPoolExecutor.execute(new Runnable() {
             @Override
             public void run() {
-                PrintWriter out = null;
+                PrintWriter writer = null;
                 try {
-                    out = new PrintWriter(socket.getOutputStream(), true);
-                    out.println(content);
+                    writer = new PrintWriter(socket.getOutputStream(), true);
+                    writer.println(content);
+                    writer.flush();
                 } catch (IOException e) {
                     e.printStackTrace();
                     Logger.e("TCPConnectThread out error: " + e);
                 }finally {
-                    out.close();
+                    //writer.close(); // 这里调用close会导致socket关闭
                 }
             }
         });

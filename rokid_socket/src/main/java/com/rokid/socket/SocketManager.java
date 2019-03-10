@@ -133,6 +133,12 @@ public class SocketManager {
                     this.mServiceCallback.onDevicesChange(devicesList);
                 }
             }
+            // 收到客户端发过来的消息
+            else if(cmd.equals(MessageEvent.CMD_S_RECV_CLIENT_MESSAGE)) {
+                String message = messageEvent.getParam(0);
+                String tag = messageEvent.getParam(1);
+                Logger.e("收到客户端 "+ tag+" 发过来的消息 message="+message);
+            }
         }
         else if(mMode == SocketMode.CLIENT) {
             // 客户端收到服务端广播的端口信息
@@ -144,7 +150,11 @@ public class SocketManager {
                     mTCPService.startConnect(tcpIp, tcpPort, masterID);
                 }
             }
-
+            // 收到服务端发过来的消息
+            else if(cmd.equals(MessageEvent.CMD_C_RECV_SERVICE_MESSAGE)) {
+                String message = messageEvent.getParam(0);
+                Logger.e("收到服务端发过来的消息 message="+message);
+            }
         }
     }
 

@@ -37,14 +37,16 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content" />
 
-        <TextView
-            android:id="@+id/tv_message"
+        <EditText
+            android:background="#ffffff"
+            android:hint="请输入消息"
+            android:id="@+id/et_message"
             android:layout_toLeftOf="@+id/btn_send"
             android:singleLine="true"
-            android:layout_margin="3dp"
+            android:layout_margin="5dp"
             android:layout_centerVertical="true"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
+            android:layout_height="match_parent" />
 
     </RelativeLayout>
 

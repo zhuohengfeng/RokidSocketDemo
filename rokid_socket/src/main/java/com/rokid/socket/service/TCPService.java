@@ -2,12 +2,14 @@ package com.rokid.socket.service;
 
 import android.app.Service;
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.os.Binder;
 import android.os.IBinder;
 import android.text.TextUtils;
 
 import com.rokid.socket.SocketManager;
 import com.rokid.socket.bean.MessageEvent;
+import com.rokid.socket.bean.ReceivePackage;
 import com.rokid.socket.bean.SocketDevice;
 import com.rokid.socket.utils.Logger;
 import com.rokid.socket.utils.Utils;
@@ -15,9 +17,10 @@ import com.rokid.socket.utils.Utils;
 import org.greenrobot.eventbus.EventBus;
 
 import java.io.BufferedReader;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.LinkedHashMap;
@@ -36,7 +39,7 @@ public class TCPService extends Service {
 
     private SocketManager.SocketMode mMode;
 
-    private String mMasterID;
+    private String mMasterID = "aaabbccdddee1112233";
 
     private ThreadPoolExecutor mThreadPoolExecutor;
 
@@ -181,7 +184,6 @@ public class TCPService extends Service {
 
                     mSocketDevices.put(device.tag, device);
 
-
                 }
             } catch (Exception e) {
                 Logger.e("TCPService: Exception in running TCPAcceptThread: "+e);
@@ -238,50 +240,46 @@ public class TCPService extends Service {
         @Override
         public void run() {
             try {
-                InputStreamReader reader = new InputStreamReader(mServiceSocket.getInputStream());
-                BufferedReader buffer_reader = new BufferedReader(reader);
-
-                PrintWriter writer = new PrintWriter(mServiceSocket.getOutputStream());
-                String host = "<" + mServiceSocket.getInetAddress().toString() + ":" + mServiceSocket.getPort() + ">";
-                writer.println("hello"+host);
-                writer.flush();
-                String received;
+                send(mServiceSocket, "hello");
+                Logger.d("TCPRecvThread：服务端收到消息进入消息等待....");
                 while (mKeepRunning && mServiceSocket != null && !mServiceSocket.isClosed()) {
                     try{
-                        received = buffer_reader.readLine();
-                        Logger.d("TCPService: 收到客户端发送的消息：received="+received);
-                        if (!TextUtils.isEmpty(received)) {
+                        ReceivePackage recvPackage = read(mServiceSocket);
+                        if (recvPackage == null) {
+                            continue;
+                        }
+
+                        Logger.d("TCPRecvThread：服务端收到消息 recvPackage ="+recvPackage);
+                        if (recvPackage.type == ReceivePackage.MSG_TYPE_STRING && !TextUtils.isEmpty(recvPackage.getStr)) {
                             SocketDevice device = mSocketDevices.get(mTag);
-                            if (received.startsWith("register")) {
-                                String name = received.split("\\|")[1];
+                            if (recvPackage.getStr.startsWith("register")) {
+                                String name = recvPackage.getStr.split("\\|")[1];
                                 Logger.d("TCPService: 客户端登录成功：name="+name);
                                 device.name = name;
                                 device.isRegisted = true;
                                 Logger.e("TCPService: 有一个新的设备加入： device="+device);
                                 EventBus.getDefault().post(new MessageEvent(MessageEvent.CMD_S_TCP_CLIENT_CHANGE));
                             }
-                            else if(received.equals("PING")) {
+                            else if(recvPackage.getStr.equals("PING")) {
                                 // TODO 接收到心跳包
 
                             }
                             else {
                                 // 服务端收到了消息
-                                EventBus.getDefault().post(new MessageEvent(MessageEvent.CMD_S_RECV_CLIENT_MESSAGE, received, mTag));
+                                EventBus.getDefault().post(new MessageEvent(MessageEvent.CMD_S_RECV_CLIENT_MESSAGE, recvPackage.getStr, mTag));
                             }
                         }
-                        //ReceivedMessage.append("client"+no+"say: "+str+"\n");
+                        else if(recvPackage.type == ReceivePackage.MSG_TYPE_BITMAP && recvPackage.getBitmap != null) {
+                            MessageEvent message = new MessageEvent(MessageEvent.CMD_S_RECV_CLIENT_BITMAP, recvPackage.getBitmap, mTag);
+                            EventBus.getDefault().post(message);
+                        }
                     }
                     catch(Exception e) {
                         Logger.e("TCPService: Exception in running TCPRecvThread"+e);
-                        //ReceivedMessage.append("client"+no+" 断开连接"+"\n");
-                        //clientItem.remove(no);
-                        //list.setModel(clientItem);
                         break;
                     }
                 }
                 mSocketDevices.remove(mTag);
-                buffer_reader.close();
-                writer.close();
                 // 状态发生变化
                 EventBus.getDefault().post(new MessageEvent(MessageEvent.CMD_S_TCP_CLIENT_CHANGE));
             } catch (Exception e) {
@@ -345,32 +343,31 @@ public class TCPService extends Service {
 
         @Override
         public void run() {
-            InputStreamReader reader = null;
             try {
                 this.mClientSocket = new Socket(mIP, mPort);
-                reader = new InputStreamReader(mClientSocket.getInputStream());
-                BufferedReader buffer_reader = new BufferedReader(reader);
-                String received="";
-                // 注意这里in()也是阻塞式的，所以不会一直循环跑，而是等待发送过来的命令消息
                 Logger.d("TCPConnectThread 客户端进入等到消息 socket="+mClientSocket);
-                PrintWriter writer = new PrintWriter(mClientSocket.getOutputStream());
                 while (mKeepRunning && mClientSocket != null && !mClientSocket.isClosed()) {
-                    // 通知UI 更新
-                    received = buffer_reader.readLine();
-                    Logger.d("TCPConnectThread：客户端收到消息 received ="+received);
-                    if (!TextUtils.isEmpty(received)) {
-                        if (received.startsWith("hello")) {
-                            writer.println("register|"+"33300011122"); // 注册的时候带上设备信息
-                            writer.flush();
+
+                    ReceivePackage recvPackage = read(mClientSocket);
+                    if (recvPackage == null) {
+                        continue;
+                    }
+
+                    Logger.d("TCPConnectThread：客户端收到消息 recvPackage ="+recvPackage);
+                    if (recvPackage.type == ReceivePackage.MSG_TYPE_STRING && !TextUtils.isEmpty(recvPackage.getStr)) {
+                        if (recvPackage.getStr.equals("hello")) {
+                            // 注册的时候带上设备信息,比如SN等
+                            send(mClientSocket, "register|"+"33300011122");
                         }
                         else {
-                            EventBus.getDefault().post(new MessageEvent(MessageEvent.CMD_C_RECV_SERVICE_MESSAGE, received));
+                            EventBus.getDefault().post(new MessageEvent(MessageEvent.CMD_C_RECV_SERVICE_MESSAGE, recvPackage.getStr));
                         }
                     }
+                    else if(recvPackage.type == ReceivePackage.MSG_TYPE_BITMAP && recvPackage.getBitmap != null) {
+                        MessageEvent message = new MessageEvent(MessageEvent.CMD_C_RECV_SERVICE_BITMAP, recvPackage.getBitmap);
+                        EventBus.getDefault().post(message);
+                    }
                 }
-                writer.close();
-                buffer_reader.close();
-                Logger.d("TCPConnectThread thread run exit---received="+received);
             } catch (Exception e) {
                 e.printStackTrace();
                 Logger.e("TCPConnectThread: CONNECTION READ EXCEPTION"+e);
@@ -383,14 +380,51 @@ public class TCPService extends Service {
                         mClientSocket.close();
                         mClientSocket = null;
                     }
-                    if (reader!= null) {
-                        reader.close();
-                    }
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
             }
         }
+    }
+
+    public ReceivePackage read(final Socket socket) throws IOException {
+        DataInputStream input = new DataInputStream(socket.getInputStream());
+        ReceivePackage msg = new ReceivePackage();
+        //读取长度，也即是消息头，
+        Logger.d("read(): 开始等待接收数据");
+        long len = input.readLong();
+        Logger.d("read(): 读到数据长度 len="+len);
+        if (len < 1) {
+            return null;
+        }
+
+        byte[] bytes = new byte[(int)len];
+        long total = 0;
+        do {
+            byte[] temp = new byte[1024];
+            int size = input.read(temp);
+            Logger.d("read(): size="+size+", total="+total+", len="+len);
+            System.arraycopy(temp, 0, bytes, (int)total, size);
+            total += size;
+        }while(total < len);
+
+
+        byte type = bytes[0];
+        Logger.d("read(): len="+len+", type="+type);
+
+        byte[] content = new byte[(int)len -1 ];
+        System.arraycopy(bytes, 1, content, 0, content.length);
+
+        msg.content = content;
+        msg.type = type;
+        if (type == ReceivePackage.MSG_TYPE_STRING) {
+            msg.getStr = new String(content);
+        }
+        else if (type == ReceivePackage.MSG_TYPE_BITMAP) {
+            msg.getBitmap = Utils.getBitmapFromBytes(content, null);
+        }
+
+        return msg;
     }
 
 
@@ -403,16 +437,44 @@ public class TCPService extends Service {
         mThreadPoolExecutor.execute(new Runnable() {
             @Override
             public void run() {
-                PrintWriter writer = null;
+                DataOutputStream out = null;
                 try {
-                    writer = new PrintWriter(socket.getOutputStream(), true);
-                    writer.println(content);
-                    writer.flush();
-                } catch (IOException e) {
+                    byte[] strArray = content.getBytes();
+                    byte[] sendMessage = new byte[1 + strArray.length];
+                    sendMessage[0] = ReceivePackage.MSG_TYPE_STRING;
+                    System.arraycopy(strArray, 0, sendMessage, 1, strArray.length);
+                    out = new DataOutputStream(socket.getOutputStream());
+                    out.writeLong(strArray.length + 1);
+                    out.write(sendMessage);
+                    out.flush();
+                } catch (Exception e) {
                     e.printStackTrace();
-                    Logger.e("TCPConnectThread out error: " + e);
-                }finally {
-                    //writer.close(); // 这里调用close会导致socket关闭
+                }
+            }
+        });
+        return true;
+    }
+
+    public boolean send(final Socket socket, final Bitmap bitmap) {
+        if (socket == null || socket.isClosed() || bitmap == null || bitmap.isRecycled()) {
+            return false;
+        }
+        Logger.d("TCPService 发送图片 bitmap=" + bitmap);
+        mThreadPoolExecutor.execute(new Runnable() {
+            @Override
+            public void run() {
+                DataOutputStream out = null;
+                try {
+                    byte[] bitmapArray = Utils.Bitmap2Bytes(bitmap);
+                    byte[] sendMessage = new byte[1 + bitmapArray.length];
+                    sendMessage[0] = ReceivePackage.MSG_TYPE_BITMAP;
+                    System.arraycopy(bitmapArray, 0, sendMessage, 1, bitmapArray.length);
+                    out = new DataOutputStream(socket.getOutputStream());
+                    out.writeLong(bitmapArray.length + 1);
+                    out.write(sendMessage);
+                    out.flush();
+                } catch (Exception e) {
+                    e.printStackTrace();
                 }
             }
         });
@@ -455,6 +517,47 @@ public class TCPService extends Service {
 
         return this.send(mSocketDevices.get(tag).socket, message);
     }
+
+
+
+    /**
+     * 客户端给服务端发送消息
+     * @return
+     */
+    public boolean sendToService(Bitmap bitmap) {
+        // 只允许客户端给服务端发送消息
+        if (mMode != SocketManager.SocketMode.CLIENT) {
+            return false;
+        }
+
+        if (mTCPConnectThread == null) {
+            return false;
+        }
+
+        return this.send(mTCPConnectThread.getSocket(), bitmap);
+    }
+
+    /**
+     * 服务端给客户端发送消息
+     * @param tag
+     * @return
+     */
+    public boolean sendToclient(Bitmap bitmap, String tag){
+        // 只允许客户端给服务端发送消息
+        if (mMode != SocketManager.SocketMode.SERVER) {
+            return false;
+        }
+
+        if (mSocketDevices == null) {
+            return false;
+        }
+
+        return this.send(mSocketDevices.get(tag).socket, bitmap);
+    }
+
+
+
+
 
 
     public boolean disconnect() {

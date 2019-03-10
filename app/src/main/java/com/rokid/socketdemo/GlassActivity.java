@@ -1,10 +1,12 @@
 package com.rokid.socketdemo;
 
+import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.rokid.socket.SocketManager;
@@ -24,6 +26,9 @@ public class GlassActivity extends AppCompatActivity implements IClientCallback 
     private EditText mMessage;
     private Button mBtnSend;
 
+    private ImageView mBtnSendImg;
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -40,6 +45,15 @@ public class GlassActivity extends AppCompatActivity implements IClientCallback 
                 if (SocketManager.getInstance().sendToService(msg)) {
                     setChatText(">>>"+msg);
                 }
+            }
+        });
+
+        mBtnSendImg = findViewById(R.id.btn_send_img);
+        mBtnSendImg.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Bitmap bitmap = Utils.createBitmapFromAssets(GlassActivity.this);
+                SocketManager.getInstance().sendToService(bitmap);
             }
         });
 
@@ -64,6 +78,11 @@ public class GlassActivity extends AppCompatActivity implements IClientCallback 
         setChatText("<<<"+message);
     }
 
+    @Override
+    public void onReceive(Bitmap bitmap) {
+        // 显示收到的图片
+        Utils.showBitmap(GlassActivity.this, bitmap);
+    }
 
     private void setChatText(String msg) {
         mAllChatText += msg +"\n";

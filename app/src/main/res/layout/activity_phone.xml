@@ -52,11 +52,22 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content" />
 
+        <ImageView
+            android:id="@+id/btn_send_img"
+            android:src="@android:drawable/btn_plus"
+            android:layout_margin="1dp"
+            android:layout_alignParentLeft="true"
+            android:layout_centerVertical="true"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+
+
         <EditText
             android:background="#ffffff"
             android:hint="请输入消息"
             android:id="@+id/et_message"
             android:layout_toLeftOf="@+id/btn_send"
+            android:layout_toRightOf="@+id/btn_send_img"
             android:singleLine="true"
             android:layout_margin="5dp"
             android:layout_centerVertical="true"

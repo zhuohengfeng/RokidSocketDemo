@@ -4,6 +4,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.graphics.Bitmap;
 import android.net.wifi.WifiManager;
 import android.os.IBinder;
 
@@ -142,6 +143,15 @@ public class SocketManager {
                     this.mServiceCallback.onReceive(message, tag);
                 }
             }
+            // 收到客户端发过来的图片
+            else if(cmd.equals(MessageEvent.CMD_S_RECV_CLIENT_BITMAP)) {
+                Bitmap bitmap = messageEvent.getBitmap();
+                String tag = messageEvent.getParam(0);
+                Logger.e("收到客户端 "+ tag+" 发过来的图片 bitmap="+bitmap);
+                if (this.mServiceCallback != null) {
+                    this.mServiceCallback.onReceive(bitmap, tag);
+                }
+            }
         }
         else if(mMode == SocketMode.CLIENT) {
             // 客户端收到服务端广播的端口信息
@@ -159,6 +169,14 @@ public class SocketManager {
                 Logger.e("收到服务端发过来的消息 message="+message);
                 if (this.mClientCallback != null) {
                     this.mClientCallback.onReceive(message);
+                }
+            }
+            // 收到服务端发过来的图片
+            else if(cmd.equals(MessageEvent.CMD_C_RECV_SERVICE_BITMAP)) {
+                Bitmap bitmap = messageEvent.getBitmap();
+                Logger.e("收到服务端发过来的图片 bitmap="+bitmap);
+                if (this.mClientCallback != null) {
+                    this.mClientCallback.onReceive(bitmap);
                 }
             }
         }
@@ -191,6 +209,33 @@ public class SocketManager {
         }
         return false;
     }
+
+
+    /**
+     * 客户端给服务端发送消息
+     * @return
+     */
+    public boolean sendToService(Bitmap bitmap) {
+        if (mTCPService != null) {
+            mTCPService.sendToService(bitmap);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * 服务端给客户端发送消息
+     * @param tag
+     * @return
+     */
+    public boolean sendToclient(Bitmap bitmap, String tag){
+        if (mTCPService != null) {
+            mTCPService.sendToclient(bitmap, tag);
+            return true;
+        }
+        return false;
+    }
+
 
     /**
      * 断开连接，如果是服务端，则断开所有连接

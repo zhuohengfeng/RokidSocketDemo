@@ -1,5 +1,6 @@
 package com.rokid.socketdemo;
 
+import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.text.TextUtils;
@@ -7,6 +8,7 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -35,6 +37,8 @@ public class PhoneActivity extends AppCompatActivity implements IServiceCallback
 
     private Spinner mDeviceSpinner;
     private DeviceListAdapter mDeviceListAdapter;
+
+    private ImageView mBtnSendImg;
 
     private String mCurrentTag;
 
@@ -82,6 +86,16 @@ public class PhoneActivity extends AppCompatActivity implements IServiceCallback
             }
         });
 
+        mBtnSendImg = findViewById(R.id.btn_send_img);
+        mBtnSendImg.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Bitmap bitmap = Utils.createBitmapFromAssets(PhoneActivity.this);
+                SocketManager.getInstance().sendToclient(bitmap, mCurrentTag);
+            }
+        });
+
+
         SocketManager.getInstance().start(this, SocketManager.SocketMode.SERVER);
         SocketManager.getInstance().setServiceCallback(this);
     }
@@ -107,6 +121,12 @@ public class PhoneActivity extends AppCompatActivity implements IServiceCallback
     @Override
     public void onReceive(String message, String tag) {
         setChatText("["+tag+"]<<<"+message);
+    }
+
+    @Override
+    public void onReceive(Bitmap bitmap, String tag) {
+        // 显示收到的图片
+        Utils.showBitmap(PhoneActivity.this, bitmap);
     }
 
     private void setChatText(String msg) {

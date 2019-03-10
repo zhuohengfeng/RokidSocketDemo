@@ -238,10 +238,12 @@ public class UDPService extends Service {
                             String tcpPort = content.split("\\|")[1];
                             String masterID = content.split("\\|")[2];
                             Logger.e("[UDPServer] 客户端收到 UDP Recv: tcpIP: " + remoteIP.getHostName() + ", tcpPort="+tcpPort+", masterID="+masterID);
-                            // 已经收到服务器TCP地址了，不需要再发送心跳包了
 
-                            EventBus.getDefault().post(new MessageEvent(cmd, remoteIP.getHostAddress(), tcpPort, masterID));
-                            break;
+                            // 这里要判断下发过来的masterID是否和本地存的masterID一致
+                            //if (masterID.equals(localMasterID)) {
+                                EventBus.getDefault().post(new MessageEvent(cmd, remoteIP.getHostAddress(), tcpPort, masterID));
+                                break;
+                            //}
                         }
                     }
                 }

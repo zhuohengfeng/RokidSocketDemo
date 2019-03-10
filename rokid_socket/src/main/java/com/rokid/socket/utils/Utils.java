@@ -1,5 +1,7 @@
 package com.rokid.socket.utils;
 
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.util.Base64;
 
 import java.io.ByteArrayInputStream;
@@ -37,37 +39,54 @@ public class Utils {
         return null;
     }
 
-    public static String serialize(Object object) {
-        byte[] result = null;
-
-        try {
-            ByteArrayOutputStream bs = new ByteArrayOutputStream();
-            ObjectOutputStream os = new ObjectOutputStream(bs);
-            os.writeObject(object);
-            os.close();
-            result = bs.toByteArray();
-        } catch (Exception e) {
-            e.printStackTrace();
-            return new String();
-        }
-
-        return Base64.encodeToString(result, Base64.NO_WRAP);
+    public static Bitmap getBitmapFromBytes(byte[] bytes, BitmapFactory.Options opts) {
+        if (bytes != null)
+            if (opts != null)
+                return BitmapFactory.decodeByteArray(bytes, 0, bytes.length,
+                        opts);
+            else
+                return BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+        return null;
     }
 
-    public static Object unserialize(String str) {
-        Object object = null;
-        byte[] bytes = Base64.decode(str, Base64.NO_WRAP);
-
-        try {
-            ByteArrayInputStream bs = new ByteArrayInputStream(bytes);
-            ObjectInputStream is = new ObjectInputStream(bs);
-            object = (Object) is.readObject();
-            is.close();
-        } catch (Exception e) {
-            e.printStackTrace();
-            return new String();
-        }
-        return object;
+    public static byte[] Bitmap2Bytes(Bitmap bm) {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        bm.compress(Bitmap.CompressFormat.PNG, 100, baos);
+        return baos.toByteArray();
     }
+
+
+//    public static String serialize(Object object) {
+//        byte[] result = null;
+//
+//        try {
+//            ByteArrayOutputStream bs = new ByteArrayOutputStream();
+//            ObjectOutputStream os = new ObjectOutputStream(bs);
+//            os.writeObject(object);
+//            os.close();
+//            result = bs.toByteArray();
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//            return new String();
+//        }
+//
+//        return Base64.encodeToString(result, Base64.NO_WRAP);
+//    }
+//
+//    public static Object unserialize(String str) {
+//        Object object = null;
+//        byte[] bytes = Base64.decode(str, Base64.NO_WRAP);
+//
+//        try {
+//            ByteArrayInputStream bs = new ByteArrayInputStream(bytes);
+//            ObjectInputStream is = new ObjectInputStream(bs);
+//            object = (Object) is.readObject();
+//            is.close();
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//            return new String();
+//        }
+//        return object;
+//    }
 
 }

@@ -3,7 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".GlassActivity">
+    tools:context=".DeviceDetailActivity">
 
     <TextView
         android:background="#ADADAD"
@@ -12,8 +12,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_alignParentTop="true"
-        android:text="正在登录中...." />
-
+        android:text="连接的设备是：" />
 
     <TextView
         android:id="@+id/tv_chat"

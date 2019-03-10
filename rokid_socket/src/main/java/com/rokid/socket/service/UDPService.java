@@ -38,6 +38,8 @@ public class UDPService extends Service {
 
     private UDPMonitorThread mUDPMonitorThread;
 
+    private String mMasterID = "abcdef0123456789";
+
     @Override
     public IBinder onBind(Intent intent) {
         mMode = (SocketManager.SocketMode)(intent.getExtras().get("mode"));
@@ -130,7 +132,7 @@ public class UDPService extends Service {
                 // 如果是客户端，定时广播发送心跳数据
                 if (mMode == SocketManager.SocketMode.SERVER) {
                     /*发送广播数据*/
-                    sendBroadcast(MessageEvent.MSG_BROADCAST_PORT + "|" + SocketManager.getInstance().portServer);
+                    sendBroadcast(MessageEvent.MSG_BROADCAST_PORT + "|" + SocketManager.getInstance().portServer+"|"+mMasterID);
                 }
             } catch (Exception e) {
                 e.printStackTrace();
@@ -234,10 +236,11 @@ public class UDPService extends Service {
                             }
 
                             String tcpPort = content.split("\\|")[1];
-                            Logger.e("[UDPServer] 客户端收到 UDP Recv: tcpIP: " + remoteIP.getHostName() + ", tcpPort="+tcpPort);
+                            String masterID = content.split("\\|")[2];
+                            Logger.e("[UDPServer] 客户端收到 UDP Recv: tcpIP: " + remoteIP.getHostName() + ", tcpPort="+tcpPort+", masterID="+masterID);
                             // 已经收到服务器TCP地址了，不需要再发送心跳包了
 
-                            EventBus.getDefault().post(new MessageEvent(cmd, remoteIP.getHostAddress(), tcpPort));
+                            EventBus.getDefault().post(new MessageEvent(cmd, remoteIP.getHostAddress(), tcpPort, masterID));
                             break;
                         }
                     }

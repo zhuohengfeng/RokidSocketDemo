@@ -8,6 +8,7 @@ import android.text.TextUtils;
 
 import com.rokid.socket.SocketManager;
 import com.rokid.socket.bean.MessageEvent;
+import com.rokid.socket.bean.SocketDevice;
 import com.rokid.socket.utils.Logger;
 import com.rokid.socket.utils.Utils;
 
@@ -19,8 +20,7 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -36,11 +36,11 @@ public class TCPService extends Service {
 
     private SocketManager.SocketMode mMode;
 
+    private String mMasterID;
+
     private ThreadPoolExecutor mThreadPoolExecutor;
 
-    // 保存所有已经连接的socket
-    private Map<Integer, Socket> mSocketlist = new HashMap<>();
-    private Map<Integer, TCPRecvThread> mTCPRecvThreadlist = new HashMap<>();
+    private LinkedHashMap<String, SocketDevice> mSocketDevices = new LinkedHashMap<>();
 
     private int mCurrentSockets = 0;
 
@@ -65,8 +65,8 @@ public class TCPService extends Service {
             mTCPAcceptThread.stopRunning();
             mTCPAcceptThread = null;
         }
-        for (TCPRecvThread recvThread : mTCPRecvThreadlist.values()) {
-            recvThread.stopRunning();
+        for (SocketDevice device : mSocketDevices.values()) {
+            ((TCPRecvThread)device.connectThread).stopRunning();
         }
 
         // For client
@@ -92,6 +92,20 @@ public class TCPService extends Service {
         super.onDestroy();
     }
 
+    public LinkedHashMap<String, SocketDevice> getAllDevices() {
+        return mSocketDevices;
+    }
+
+    public LinkedHashMap<String, SocketDevice> getAllRegistedDevices() {
+        LinkedHashMap<String, SocketDevice> registedDevices = new LinkedHashMap<>();
+        for (SocketDevice device : mSocketDevices.values()) {
+            if (device.isRegisted) {
+                registedDevices.put(device.tag, device);
+            }
+        }
+        return registedDevices;
+    }
+
     /**
      * TCP服务端开启监听模式，等到客户端连接
      */
@@ -108,9 +122,10 @@ public class TCPService extends Service {
     /**
      * 客户端连接服务端
      */
-    public void startConnect(String ip, int port) {
-        Logger.d("TCPService: startConnect ip="+ip+"， port="+port);
+    public void startConnect(String ip, int port, String masterID) {
+        Logger.d("TCPService: startConnect ip="+ip+"， port="+port+", masterID="+masterID);
         if (mMode == SocketManager.SocketMode.CLIENT) {
+            this.mMasterID = masterID;
             // 启动监听TCP线程
             mTCPConnectThread = new TCPConnectThread(ip, port);
             if (mTCPConnectThread != null) {
@@ -153,25 +168,26 @@ public class TCPService extends Service {
                 Logger.d("TCPService: 服务端启动，进入监听状态 port="+SocketManager.getInstance().portServer+", Address="+ Utils.getLocalAddress());
 
                 // 服务器等待客户端的tcp连接 ---- 终于等到TCP连接上了，这里就在服务端创建一个设备名称在APP端连接
-                while (mKeepRunning) {
-                    Socket client = mServerSocket.accept();
-                    int index = ++mCurrentSockets;
-                    mSocketlist.put(index, client);
+                while (mKeepRunning && mServerSocket!=null & !mServerSocket.isClosed()) {
+                    Socket clientSocket = mServerSocket.accept();
 
-                    TCPRecvThread tcpRecvThread = new TCPRecvThread(client, index);
-                    mTCPRecvThreadlist.put(index, tcpRecvThread);
-                    tcpRecvThread.start();
+                    SocketDevice device = new SocketDevice();
+                    device.tag = String.valueOf(++mCurrentSockets);
+                    device.socket = clientSocket;
+                    device.isRegisted = false;
 
-                    Logger.e("TCPService: 有一个新的设备加入： client="+client);
+                    device.connectThread = new TCPRecvThread(device.socket, device.tag);
+                    device.connectThread.start();
 
-                    EventBus.getDefault().post(new MessageEvent(MessageEvent.CMD_S_ACCEPT_NEW_CLIENT));
+                    mSocketDevices.put(device.tag, device);
+
 
                 }
             } catch (Exception e) {
                 Logger.e("TCPService: Exception in running TCPAcceptThread: "+e);
             }
             finally {
-                mSocketlist.clear();
+                mSocketDevices.clear();
                 try {
                     mServerSocket.close();
                     mServerSocket = null;
@@ -188,13 +204,13 @@ public class TCPService extends Service {
     private class TCPRecvThread extends Thread {
 
         private final Socket mServiceSocket;
-        private final int mIndex;
         private Boolean mKeepRunning;
+        private final String mTag;
 
-        public TCPRecvThread(Socket socket ,int index) {
+        public TCPRecvThread(Socket socket, String tag) {
             this.mServiceSocket = socket;
-            this.mIndex = index;
             this.mKeepRunning = true;
+            this.mTag = tag;
         }
 
         public void stopRunning() {
@@ -226,8 +242,8 @@ public class TCPService extends Service {
                 BufferedReader buffer_reader = new BufferedReader(reader);
 
                 PrintWriter writer = new PrintWriter(mServiceSocket.getOutputStream());
-                String client = "<" + mServiceSocket.getInetAddress().toString() + ":" + mServiceSocket.getPort() + ">";
-                writer.println("hello i am server...");
+                String host = "<" + mServiceSocket.getInetAddress().toString() + ":" + mServiceSocket.getPort() + ">";
+                writer.println("hello"+host);
                 writer.flush();
                 String str;
                 while (mKeepRunning && mServiceSocket != null && !mServiceSocket.isClosed()) {
@@ -236,8 +252,20 @@ public class TCPService extends Service {
                         Logger.d("TCPService: 收到客户端发送的消息：str="+str);
 
                         if (str == null) {
-                            Logger.e("TCPService: 客户端"+mIndex+" 已经断开了");
+                            Logger.e("TCPService: 客户端"+mTag+" 已经断开了");
                             break;
+                        }
+                        else {
+                            if (str.startsWith("register")) {
+                                String name = str.split("\\|")[1];
+                                Logger.d("TCPService: 客户端登录成功：name="+name);
+
+                                SocketDevice device = mSocketDevices.get(mTag);
+                                device.name = name;
+                                device.isRegisted = true;
+                                Logger.e("TCPService: 有一个新的设备加入： device="+device);
+                                EventBus.getDefault().post(new MessageEvent(MessageEvent.CMD_S_TCP_CLIENT_CHANGE));
+                            }
                         }
                         //ReceivedMessage.append("client"+no+"say: "+str+"\n");
                     }
@@ -249,9 +277,10 @@ public class TCPService extends Service {
                         break;
                     }
                 }
-                mSocketlist.remove(mIndex);
+                mSocketDevices.remove(mTag);
                 buffer_reader.close();
-                EventBus.getDefault().post(new MessageEvent(MessageEvent.CMD_S_CLIENT_DISCONNECT));
+                // 状态发生变化
+                EventBus.getDefault().post(new MessageEvent(MessageEvent.CMD_S_TCP_CLIENT_CHANGE));
             } catch (Exception e) {
                 e.printStackTrace();
                 Logger.e("TCPService: Exception "+e);
@@ -326,6 +355,11 @@ public class TCPService extends Service {
                     received = buffer_reader.readLine();
                     Logger.d("TCPConnectThread：客户端收到消息 received ="+received);
                     //sendMsg("MSG", received);
+                    if (received.startsWith("hello")) {
+                        PrintWriter writer = new PrintWriter(mClientSocket.getOutputStream());
+                        writer.println("register|"+"sn30008001");
+                        writer.flush();
+                    }
                 }
                 Logger.d("TCPConnectThread thread run exit---received="+received);
             } catch (Exception e) {
@@ -396,24 +430,23 @@ public class TCPService extends Service {
     /**
      * 服务端给客户端发送消息
      * @param message
-     * @param index
+     * @param tag
      * @return
      */
-    public boolean sendToclient(String message, int index){
+    public boolean sendToclient(String message, String tag){
         // 只允许客户端给服务端发送消息
         if (mMode != SocketManager.SocketMode.SERVER) {
             return false;
         }
 
-        if (mSocketlist == null) {
+        if (mSocketDevices == null) {
             return false;
         }
 
-        return this.send(mSocketlist.get(index), message);
+        return this.send(mSocketDevices.get(tag).socket, message);
     }
 
 
-    /** 客户端某个具体玩家去断开连接 */
     public boolean disconnect() {
         Logger.d("Disconnecting the TCP connect");
         if (mMode == SocketManager.SocketMode.CLIENT) {
@@ -428,20 +461,18 @@ public class TCPService extends Service {
             return true;
         }
         else if (mMode == SocketManager.SocketMode.SERVER) {
-            if (mTCPRecvThreadlist != null) {
-                for (TCPRecvThread thread : mTCPRecvThreadlist.values()) {
-                    if (thread != null && thread.isAlive()) {
+            if (mSocketDevices != null) {
+                for (SocketDevice device : mSocketDevices.values()) {
+                    if (device.connectThread != null && device.connectThread.isAlive()) {
                         // 调用客户端的close函数
-                        thread.close();
-                        while (thread.isAlive()) {
+                        ((TCPRecvThread)device.connectThread).close();
+                        while (device.connectThread.isAlive()) {
                             ;
                         }
                     }
                 }
-                mTCPRecvThreadlist.clear();
-                mTCPRecvThreadlist = null;
-                mSocketlist.clear();
-                mSocketlist = null;
+                mSocketDevices.clear();
+                mSocketDevices = null;
                 return true;
             }
         }

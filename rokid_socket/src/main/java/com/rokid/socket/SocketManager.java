@@ -7,14 +7,19 @@ import android.content.ServiceConnection;
 import android.net.wifi.WifiManager;
 import android.os.IBinder;
 
+import com.rokid.socket.bean.MessageEvent;
+import com.rokid.socket.bean.SocketDevice;
+import com.rokid.socket.callback.IClientCallback;
+import com.rokid.socket.callback.IServiceCallback;
 import com.rokid.socket.service.TCPService;
 import com.rokid.socket.service.UDPService;
-import com.rokid.socket.bean.MessageEvent;
 import com.rokid.socket.utils.Logger;
 
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
+
+import java.util.LinkedHashMap;
 
 /**
  * @author: zhuo_hf@foxmail.com
@@ -48,6 +53,10 @@ public class SocketManager {
     private TCPService mTCPService;
 
     private UDPService mUDPService;
+
+    private IClientCallback mClientCallback;
+    private IServiceCallback mServiceCallback;
+
 
     private SocketManager() {
         /*this.mDevices = new Vector<>();*/
@@ -109,8 +118,6 @@ public class SocketManager {
     public void handleEvent(MessageEvent messageEvent) {
         Logger.d("收到事件, messageEvent="+messageEvent);
         String cmd = messageEvent.getCommand();
-        String param1 = messageEvent.getParam1();
-        String param2 = messageEvent.getParam2();
         if (mMode == SocketMode.SERVER) {
             // TCP服务端启动成功
             if (cmd.equals(MessageEvent.CMD_S_TCP_SERVICE_SETUP)) {
@@ -118,18 +125,23 @@ public class SocketManager {
                 tcpIntent.putExtra("mode", mMode);
                 mContext.bindService(tcpIntent, mUDPServiceConnection, Context.BIND_AUTO_CREATE);
             }
-            // 有新的TCP客户端连接上了
-            else if (cmd.equals(MessageEvent.CMD_S_ACCEPT_NEW_CLIENT)) {
+            // 有新的TCP客户端连接上了或者断开
+            else if (cmd.equals(MessageEvent.CMD_S_TCP_CLIENT_CHANGE)) {
                 //
+                if (this.mServiceCallback != null) {
+                    LinkedHashMap<String, SocketDevice> devicesList = mTCPService.getAllRegistedDevices();
+                    this.mServiceCallback.onDevicesChange(devicesList);
+                }
             }
         }
         else if(mMode == SocketMode.CLIENT) {
             // 客户端收到服务端广播的端口信息
             if (cmd.equals(MessageEvent.MSG_BROADCAST_PORT)) {
                 if (mTCPService != null) {
-                    String tcpIp = param1;
-                    int tcpPort = Integer.valueOf(param2);
-                    mTCPService.startConnect(tcpIp, tcpPort);
+                    String tcpIp = messageEvent.getParam(0);
+                    int tcpPort = Integer.valueOf(messageEvent.getParam(1));
+                    String masterID = messageEvent.getParam(2);
+                    mTCPService.startConnect(tcpIp, tcpPort, masterID);
                 }
             }
 
@@ -153,12 +165,12 @@ public class SocketManager {
     /**
      * 服务端给客户端发送消息
      * @param message
-     * @param index
+     * @param tag
      * @return
      */
-    public boolean sendToclient(String message, int index){
+    public boolean sendToclient(String message, String tag){
         if (mTCPService != null) {
-            mTCPService.sendToclient(message, index);
+            mTCPService.sendToclient(message, tag);
             return true;
         }
         return false;
@@ -174,7 +186,6 @@ public class SocketManager {
         }
         return false;
     }
-
 
     private ServiceConnection mTCPServiceConnection = new ServiceConnection() {
         @Override
@@ -202,6 +213,16 @@ public class SocketManager {
             mUDPService = null;
         }
     };
+
+
+    public void setClientCallback(IClientCallback callback) {
+        this.mClientCallback = callback;
+    }
+
+    public void setServiceCallback(IServiceCallback callback) {
+        this.mServiceCallback = callback;
+    }
+
 
 
 }

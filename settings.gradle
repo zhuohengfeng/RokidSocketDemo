@@ -1,0 +1,1 @@
+include ':app', ':rokid_socket'

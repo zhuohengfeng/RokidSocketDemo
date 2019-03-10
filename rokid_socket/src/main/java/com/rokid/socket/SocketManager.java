@@ -138,6 +138,9 @@ public class SocketManager {
                 String message = messageEvent.getParam(0);
                 String tag = messageEvent.getParam(1);
                 Logger.e("收到客户端 "+ tag+" 发过来的消息 message="+message);
+                if (this.mServiceCallback != null) {
+                    this.mServiceCallback.onReceive(message, tag);
+                }
             }
         }
         else if(mMode == SocketMode.CLIENT) {
@@ -154,6 +157,9 @@ public class SocketManager {
             else if(cmd.equals(MessageEvent.CMD_C_RECV_SERVICE_MESSAGE)) {
                 String message = messageEvent.getParam(0);
                 Logger.e("收到服务端发过来的消息 message="+message);
+                if (this.mClientCallback != null) {
+                    this.mClientCallback.onReceive(message);
+                }
             }
         }
     }

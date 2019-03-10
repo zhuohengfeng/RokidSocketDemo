@@ -11,9 +11,9 @@ import java.util.List;
 public class MessageEvent{
     public final static String MSG_BROADCAST_PORT = "msg_udp_broadcast_port";
 
-    public final static String CMD_S_TCP_SERVICE_SETUP = "cmd_tcp_s_tcp_service_setup";
-    public final static String CMD_S_TCP_CLIENT_CHANGE = "cmd_tcp_s_tcp_client_change";
-    public final static String CMD_S_RECV_CLIENT_MESSAGE = "cmd_tcp_s_tcp_recv_client_message";
+    public final static String CMD_S_TCP_SERVICE_SETUP = "cmd_tcp_s_service_setup";
+    public final static String CMD_S_TCP_CLIENT_CHANGE = "cmd_tcp_s_client_change";
+    public final static String CMD_S_RECV_CLIENT_MESSAGE = "cmd_tcp_s_recv_client_message";
     //public final static String CMD_S_ACCEPT_NEW_CLIENT = "cmd_tcp_s_accept_new_client";
     //public final static String CMD_S_CLIENT_DISCONNECT = "cmd_tcp_s_client_disconnect";
 

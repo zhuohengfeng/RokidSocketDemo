@@ -360,11 +360,11 @@ public class TCPService extends Service {
                     Logger.d("TCPConnectThread：客户端收到消息 received ="+received);
                     if (!TextUtils.isEmpty(received)) {
                         if (received.startsWith("hello")) {
-                            writer.println("register|"+mMasterID);
+                            writer.println("register|"+"33300011122"); // 注册的时候带上设备信息
                             writer.flush();
                         }
                         else {
-                            EventBus.getDefault().post(new MessageEvent(MessageEvent.CMD_S_RECV_CLIENT_MESSAGE, received));
+                            EventBus.getDefault().post(new MessageEvent(MessageEvent.CMD_C_RECV_SERVICE_MESSAGE, received));
                         }
                     }
                 }

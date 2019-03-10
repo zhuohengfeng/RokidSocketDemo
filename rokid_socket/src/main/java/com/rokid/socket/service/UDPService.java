@@ -180,7 +180,7 @@ public class UDPService extends Service {
                 task = new TimerTask() {
                     @Override
                     public void run() {
-                        Logger.d("[UDPServer] 客户端发送心跳包....");
+                        Logger.d("[UDPServer] 服务器发送广播....");
                         try {
                             InetAddress local = InetAddress.getByName(SocketManager.UDP_IP);
                             DatagramPacket packet = new DatagramPacket(data.getBytes(), data.length(), local, SocketManager.UDP_PORT);

@@ -17,7 +17,7 @@ import com.rokid.socket.callback.IClientCallback;
  */
 public class GlassActivity extends AppCompatActivity implements IClientCallback {
 
-    private String mAllChatText;
+    private String mAllChatText="";
 
     private TextView mStatus;
     private TextView mChat;

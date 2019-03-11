@@ -2,6 +2,8 @@ package com.rokid.socket.callback;
 
 import android.graphics.Bitmap;
 
+import com.rokid.socket.SocketManager;
+
 /**
  * @author: zhuo_hf@foxmail.com
  * @version: 1.0
@@ -9,7 +11,7 @@ import android.graphics.Bitmap;
  */
 public interface IClientCallback {
 
-    void onStatusChange(String status);
+    void onStatusChange(SocketManager.SocketStatus status);
 
     void onReceive(String message);
 

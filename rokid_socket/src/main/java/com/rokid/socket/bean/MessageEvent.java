@@ -2,6 +2,9 @@ package com.rokid.socket.bean;
 
 import android.graphics.Bitmap;
 
+import com.rokid.socket.SocketManager;
+
+import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -18,7 +21,7 @@ public class MessageEvent{
     public final static String CMD_S_RECV_CLIENT_MESSAGE = "cmd_tcp_s_recv_client_message";
     public final static String CMD_S_RECV_CLIENT_BITMAP = "cmd_tcp_s_recv_client_bitmap";
 
-    public final static String CMD_C_DISCONNECT = "cmd_tcp_c_disconnect";
+    public final static String CMD_C_CONNECT_CHANGE = "cmd_tcp_c_connect_change";
     public final static String CMD_C_RECV_SERVICE_MESSAGE = "cmd_tcp_c_recv_service_message";
     public final static String CMD_C_RECV_SERVICE_BITMAP = "cmd_tcp_c_recv_service_bitmap";
 
@@ -27,8 +30,15 @@ public class MessageEvent{
 
     private Bitmap bitmap;
 
+    private SocketManager.SocketStatus status;
+
     public MessageEvent(String command){
         this.command=command;
+    }
+
+    public MessageEvent(String command, SocketManager.SocketStatus status){
+        this.command = command;
+        this.status = status;
     }
 
     public MessageEvent(String command,Bitmap bitmap, String... params){
@@ -56,6 +66,10 @@ public class MessageEvent{
 
     public Bitmap getBitmap() {
         return bitmap;
+    }
+
+    public SocketManager.SocketStatus getStatus() {
+        return this.status;
     }
 
     @Override

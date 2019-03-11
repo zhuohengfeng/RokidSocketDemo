@@ -69,8 +69,19 @@ public class GlassActivity extends AppCompatActivity implements IClientCallback 
 
 
     @Override
-    public void onStatusChange(String status) {
-        mStatus.setText(status);
+    public void onStatusChange(SocketManager.SocketStatus status) {
+        String str = "正在连接中...";
+        if (status == SocketManager.SocketStatus.CONNECTED) {
+            str = "已经连接上";
+        }
+        else if (status == SocketManager.SocketStatus.CONNECTING) {
+            str = "正在连接中...";
+        }
+        else if (status == SocketManager.SocketStatus.DISCONNECT) {
+            str = "断开连接！";
+        }
+
+        mStatus.setText(str);
     }
 
     @Override

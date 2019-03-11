@@ -33,6 +33,11 @@ public class SocketManager {
     public enum SocketMode {
         SERVER, CLIENT
     }
+
+    public enum SocketStatus {
+        UNKNOW, CONNECTING, CONNECTED, DISCONNECT
+    }
+
     private SocketMode mMode;
 
     private Context mContext;
@@ -179,6 +184,14 @@ public class SocketManager {
                     this.mClientCallback.onReceive(bitmap);
                 }
             }
+            // 断开连接，通知更新UI
+            else if(cmd.equals(MessageEvent.CMD_C_CONNECT_CHANGE)){
+                SocketStatus status = messageEvent.getStatus();
+                Logger.e("客户端状态改变 status="+status);
+                if (this.mClientCallback != null) {
+                    this.mClientCallback.onStatusChange(status);
+                }
+            }
         }
     }
 
@@ -231,18 +244,6 @@ public class SocketManager {
     public boolean sendToclient(Bitmap bitmap, String tag){
         if (mTCPService != null) {
             mTCPService.sendToclient(bitmap, tag);
-            return true;
-        }
-        return false;
-    }
-
-
-    /**
-     * 断开连接，如果是服务端，则断开所有连接
-     */
-    public boolean disconnect(){
-        if (mTCPService != null) {
-            mTCPService.disconnect();
             return true;
         }
         return false;

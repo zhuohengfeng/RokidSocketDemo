@@ -4,6 +4,11 @@ import android.graphics.Bitmap;
 
 import java.util.Arrays;
 
+/**
+ * @author: zhuo_hf@foxmail.com
+ * @version: 1.0
+ * Create Time: 2019/3/11
+ */
 public class ReceivePackage {
     public final static byte MSG_TYPE_STRING = 0x01;
     public final static byte MSG_TYPE_BITMAP = 0x02;

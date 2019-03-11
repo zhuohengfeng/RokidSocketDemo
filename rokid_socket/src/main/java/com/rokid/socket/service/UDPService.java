@@ -14,6 +14,7 @@ import com.rokid.socket.utils.Utils;
 
 import org.greenrobot.eventbus.EventBus;
 
+import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -105,7 +106,7 @@ public class UDPService extends Service {
         private TimerTask task;
 
         public UDPMonitorThread(SocketManager.SocketMode mode) {
-            super("UPDServer");
+            super("UDPMonitorThread");
             this.mMode = mode;
             this.keepRunning = true;
             try {
@@ -132,7 +133,7 @@ public class UDPService extends Service {
                 // 如果是客户端，定时广播发送心跳数据
                 if (mMode == SocketManager.SocketMode.SERVER) {
                     /*发送广播数据*/
-                    sendBroadcast(MessageEvent.MSG_BROADCAST_PORT + "|" + SocketManager.getInstance().portServer+"|"+mMasterID);
+                    sendBroadcast(MessageEvent.MSG_BROADCAST_PORT + "|" + SocketManager.getInstance().portServer + "|" +  mMasterID);
                 }
             } catch (Exception e) {
                 e.printStackTrace();
@@ -143,15 +144,14 @@ public class UDPService extends Service {
                         multicastSocket.close();
                     }
                 } catch (Exception e1) {
-                    Logger.e("[UDPServer] Exception creating socket"+e1);
+                    Logger.e("[UDPServer] Exception leaveGroup"+e1);
                     e.printStackTrace();
                 }
             }
         }
 
-        // 断开UDP线程， 离开组播UDP
+        /** 断开UDP线程， 离开组播UDP */
         public void close() {
-            Logger.d("[UDPServer] close udp server...bye...");
             this.keepRunning = false;
 
             if (timer != null) {
@@ -180,7 +180,6 @@ public class UDPService extends Service {
                 task = new TimerTask() {
                     @Override
                     public void run() {
-                        Logger.d("[UDPServer] 服务器发送广播....");
                         try {
                             InetAddress local = InetAddress.getByName(SocketManager.UDP_IP);
                             DatagramPacket packet = new DatagramPacket(data.getBytes(), data.length(), local, SocketManager.UDP_PORT);
@@ -193,7 +192,7 @@ public class UDPService extends Service {
                 };
             }
 
-            timer.schedule(task, 1000, 4000);
+            timer.schedule(task, 1000, 3000);
         }
 
 
@@ -204,19 +203,17 @@ public class UDPService extends Service {
                 byte[] buf = new byte[1024];
 
                 while (keepRunning && multicastSocket != null && !multicastSocket.isClosed()) {
-                    Logger.d("[UDPServer] Inside while");
+                    Logger.d("[UDPServer] Inside while.....");
 
                     // 这里会阻塞住，一直等待新的报文传递过来！！！
                     DatagramPacket packet = new DatagramPacket(buf, buf.length);
                     multicastSocket.receive(packet);
-                    Logger.d("[UDPServer] Datagram received");
 
                     // 是谁发过来的?
                     InetAddress remoteIP = packet.getAddress();
 
                     // 判断消息是不是自己发送的
                     if ((remoteIP.getHostAddress()).equals(Utils.getLocalAddress().getHostAddress())){
-                        Logger.d("[UDPServer] 发给自己了....return");
                         continue;
                     }
 
@@ -237,7 +234,7 @@ public class UDPService extends Service {
 
                             String tcpPort = content.split("\\|")[1];
                             String masterID = content.split("\\|")[2];
-                            Logger.e("[UDPServer] 客户端收到 UDP Recv: tcpIP: " + remoteIP.getHostName() + ", tcpPort="+tcpPort+", masterID="+masterID);
+                            Logger.d("[UDPServer] 客户端收到 UDP Recv: tcpIP: " + remoteIP.getHostName() + ", tcpPort="+tcpPort+", masterID="+masterID);
 
                             // 这里要判断下发过来的masterID是否和本地存的masterID一致
                             //if (masterID.equals(localMasterID)) {
@@ -247,16 +244,24 @@ public class UDPService extends Service {
                         }
                     }
                 }
-                Logger.e("[UDPServer] UDPFinished work.....Bye....");
+                Logger.d("[UDPServer] UDPFinished work.....Bye....");
                 close();
             } catch (Exception e) {
                 e.printStackTrace();
-                Logger.d("Exception e:"+e);
+                Logger.e("[UDPServer] Exception in read e:"+e);
+            }
+            finally {
+                try {
+                    if (multicastSocket != null && !multicastSocket.isClosed()) {
+                        multicastSocket.close();
+                        multicastSocket = null;
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
         }
     }
-
-
 
     public class LocalBinder extends Binder {
         public UDPService getService() {
